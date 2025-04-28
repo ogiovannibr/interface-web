@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Volans</title>
+  <link rel="stylesheet" href="styles/dashboard.css">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jwt-decode@3.1.2/build/jwt-decode.min.js"></script>
+</head>
+<body>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div class="admin-info">
+        <span>Bem-vindo, <strong id="adminName">Admin</strong>!</span>
+      </div>
+      <button id="logoutButton" onclick="logout()">Sair</button>
+    </div>
+
+    <!-- Loading message -->
+    <div class="loading" id="loadingMessage">Carregando dados...</div>
+
+    <!-- Dashboard content -->
+    <div id="dashboard" style="display: none;">
+      <!-- KPIs -->
+      <div class="kpis">
+        <div class="kpi">
+          <h2 id="usuariosCadastrados">0</h2>
+          <p>Usuários Cadastrados</p>
+        </div>
+        <div class="kpi">
+          <h2 id="baralhosCriados">0</h2>
+          <p>Baralhos Criados</p>
+        </div>
+        <div class="kpi">
+          <h2 id="flashcardsCriados">0</h2>
+          <p>Flashcards Criados</p>
+        </div>
+      </div>
+
+      <!-- Gráficos -->
+      <div class="charts">
+        <div class="chart-container" id="chart1">Gráfico 1</div>
+        <div class="chart-container" id="chart2">Gráfico 2</div>
+      </div>
+
+      <!-- Tabela de usuários -->
+      <div class="users-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>Data de Criação</th>
+              <th>Baralhos</th>
+              <th>Flashcards</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dados dos usuários serão inseridos dinamicamente aqui -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const verificarRoleAdmin = () => {
+      const token = localStorage.getItem('authToken');
+      if (!token) return false;
+  
+      try {
+        const decoded = jwt_decode(token);
+        return decoded.roles && decoded.roles.includes('ROLE_ADMIN');
+      } catch (error) {
+        return false;
+      }
+    };
+  
+    const fetchData = async () => {
+      const token = localStorage.getItem('authToken');
+  
+      if (!token || !verificarRoleAdmin()) {
+        window.location.href = '/index.html';  // Redireciona para login se o token for inválido ou não for admin
+        return;
+      }
+  
+      try {
+        const response = await axios.get('https://volans-api-javaspring.onrender.com/admin/dashboard', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+  
+        const data = response.data;
+        if (data) {
+          document.getElementById('usuariosCadastrados').innerText = data.totalUsuarios || 'Não disponível';
+          document.getElementById('baralhosCriados').innerText = data.totalBaralhos || 'Não disponível';
+          document.getElementById('flashcardsCriados').innerText = data.totalFlashcards || 'Não disponível';
+  
+          document.getElementById('dashboard').style.display = 'block';
+          document.getElementById('loadingMessage').style.display = 'none';
+        } else {
+          alert("Dados da API estão vazios ou indefinidos.");
+        }
+      } catch (error) {
+        if (error.response && error.response.status === 401) {
+          localStorage.removeItem('authToken');
+          window.location.href = '/index.html';
+        } else {
+          alert("Ocorreu um erro ao buscar os dados. Tente novamente.");
+        }
+      }
+    };
+  
+    const logout = () => {
+      localStorage.removeItem('authToken');
+      window.location.href = '/index.html';
+    };
+
+    window.onload = fetchData;
+  </script>
+
+</body>
+</html>
