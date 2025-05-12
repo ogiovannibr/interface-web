@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Volans Admin - Login</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jwt-decode@3.1.2/build/jwt-decode.min.js"></script>
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+  <!-- Seção de Login -->
+  <div id="loginSection" class="login-container">
+    <div class="login-card">
+      <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/LogoVolansWhiteNoBG%201-UAse45zZgUgf201ysCDxjfjzENwBb5.png" alt="Volans Logo" class="login-logo">
+      <h1 class="login-title">Painel Administrativo</h1>
+      <form id="loginForm" class="login-form">
+        <div class="form-group">
+          <input type="text" id="user" class="form-input" placeholder="Usuário" required>
+        </div>
+        <div class="form-group">
+          <input type="password" id="password" class="form-input" placeholder="Senha" required>
+        </div>
+        <button type="submit" class="login-button">Entrar</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Verificar se já existe um token salvo
+    document.addEventListener('DOMContentLoaded', function() {
+      const token = localStorage.getItem('authToken');
+      if (token && verificarRoleAdmin()) {
+        window.location.href = 'dashboard.html';
+      }
+    });
+
+    // Funções de Login
+    const mostrarMensagemErro = (mensagem) => {
+      alert(mensagem);
+    };
+  
+    const salvarToken = (token) => {
+      localStorage.setItem('authToken', token);
+    };
+  
+    const verificarRoleAdmin = () => {
+      const token = localStorage.getItem('authToken');
+      if (!token) return false;
+  
+      try {
+        const decoded = jwt_decode(token);
+        return decoded.roles && decoded.roles.includes('ROLE_ADMIN');
+      } catch (error) {
+        return false;
+      }
+    };
+  
+    const login = async (username, password) => {
+      try {
+        const response = await axios.post(
+          'https://volans-api-javaspring.onrender.com/api/auth/login', 
+          {
+            username: username,
+            password: password
+          },
+          {
+            withCredentials: true,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          }
+        );
+  
+        const token = response.data.token;
+        if (token) {
+          salvarToken(token);
+          window.location.href = 'dashboard.html';
+        } else {
+          mostrarMensagemErro('Token não recebido. Verifique o servidor ou a resposta da API.');
+        }
+      } catch (error) {
+        console.error('Erro ao fazer login:', error);
+  
+        if (error.response) {
+          if (error.response.status === 401) {
+            mostrarMensagemErro('Usuário ou senha inválidos.');
+          } else if (error.response.status === 403) {
+            mostrarMensagemErro('Acesso proibido. Você não tem permissão.');
+          } else if (error.response.status === 404) {
+            mostrarMensagemErro('Endpoint de login não encontrado.');
+          } else {
+            mostrarMensagemErro(`Erro no servidor: ${error.response.status}`);
+          }
+        } else if (error.request) {
+          mostrarMensagemErro('Sem resposta do servidor. Verifique sua conexão.');
+        } else {
+          mostrarMensagemErro('Erro ao configurar a requisição de login.');
+        }
+      }
+    };
+  
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const username = document.getElementById('user').value.trim();
+      const password = document.getElementById('password').value.trim();
+  
+      if (!username || !password) {
+        mostrarMensagemErro('Preencha todos os campos antes de enviar.');
+        return;
+      }
+  
+      login(username, password);
+    });
+  </script>
+</body>
+</html>

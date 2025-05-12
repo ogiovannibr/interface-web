@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Volans Admin - Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jwt-decode@3.1.2/build/jwt-decode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <!-- Seção do Dashboard -->
+  <div id="dashboardSection" class="dashboard-container">
+    <div class="topbar">
+      <div class="admin-info">
+        <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/LogoVolansWhiteNoBG%201-UAse45zZgUgf201ysCDxjfjzENwBb5.png" alt="Volans Logo" height="30">
+        <span>Bem-vindo, <strong id="adminName">Admin</strong>!</span>
+      </div>
+      <button id="logoutButton" class="logout-button">Sair</button>
+    </div>
+
+    <!-- Loading message -->
+    <div class="loading" id="loadingMessage">Carregando dados...</div>
+
+    <!-- Dashboard content -->
+    <div id="dashboard" style="display: none;">
+      <!-- KPIs -->
+      <div class="kpis">
+        <div class="kpi">
+          <h2 id="usuariosCadastrados">0</h2>
+          <p>Usuários Cadastrados</p>
+        </div>
+        <div class="kpi">
+          <h2 id="baralhosCriados">0</h2>
+          <p>Baralhos Criados</p>
+        </div>
+        <div class="kpi">
+          <h2 id="flashcardsCriados">0</h2>
+          <p>Flashcards Criados</p>
+        </div>
+      </div>
+
+      <!-- Gráficos -->
+      <div class="charts-container">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">Usuários</div>
+            <div class="time-filter-container">
+              <div class="time-filter-label">Período:</div>
+              <div class="time-filter">
+                <button class="time-filter-btn" data-chart="users" data-period="days">
+                  <i class="fas fa-calendar-day"></i> Diário
+                </button>
+                <button class="time-filter-btn active" data-chart="users" data-period="month">
+                  <i class="fas fa-calendar-week"></i> Mensal
+                </button>
+                <button class="time-filter-btn" data-chart="users" data-period="year">
+                  <i class="fas fa-calendar"></i> Anual
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-content">
+            <canvas id="usersChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">Flashcards</div>
+            <div class="time-filter-container">
+              <div class="time-filter-label">Período:</div>
+              <div class="time-filter">
+                <button class="time-filter-btn" data-chart="flashcards" data-period="days">
+                  <i class="fas fa-calendar-day"></i> Diário
+                </button>
+                <button class="time-filter-btn active" data-chart="flashcards" data-period="month">
+                  <i class="fas fa-calendar-week"></i> Mensal
+                </button>
+                <button class="time-filter-btn" data-chart="flashcards" data-period="year">
+                  <i class="fas fa-calendar"></i> Anual
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-content">
+            <canvas id="flashcardsChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">Baralhos</div>
+            <div class="time-filter-container">
+              <div class="time-filter-label">Período:</div>
+              <div class="time-filter">
+                <button class="time-filter-btn" data-chart="decks" data-period="days">
+                  <i class="fas fa-calendar-day"></i> Diário
+                </button>
+                <button class="time-filter-btn active" data-chart="decks" data-period="month">
+                  <i class="fas fa-calendar-week"></i> Mensal
+                </button>
+                <button class="time-filter-btn" data-chart="decks" data-period="year">
+                  <i class="fas fa-calendar"></i> Anual
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-content">
+            <canvas id="decksChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela de usuários -->
+      <div class="users-table-container">
+        <div class="table-header">
+          <div class="table-title">Usuários Recentes</div>
+        </div>
+        <div class="table-content">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Email</th>
+                <th>Data de Criação</th>
+                <th>Baralhos</th>
+                <th>Flashcards</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody">
+              <!-- Dados dos usuários serão inseridos dinamicamente aqui -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Variáveis para armazenar as instâncias dos gráficos
+    let usersChart, flashcardsChart, decksChart;
+    
+    // Verificar se o usuário está autenticado
+    document.addEventListener('DOMContentLoaded', function() {
+      const token = localStorage.getItem('authToken');
+      if (!token || !verificarRoleAdmin()) {
+        window.location.href = 'index.html';
+        return;
+      }
+      
+      fetchData();
+      
+      // Adicionar event listeners para os botões de filtro
+      document.querySelectorAll('.time-filter-btn').forEach(button => {
+        button.addEventListener('click', function() {
+          const chart = this.getAttribute('data-chart');
+          const period = this.getAttribute('data-period');
+          
+          // Remover classe 'active' de todos os botões do mesmo gráfico
+          document.querySelectorAll(`.time-filter-btn[data-chart="${chart}"]`).forEach(btn => {
+            btn.classList.remove('active');
+          });
+          
+          // Adicionar classe 'active' ao botão clicado
+          this.classList.add('active');
+          
+          // Atualizar o gráfico com o período selecionado
+          atualizarGrafico(chart, period);
+        });
+      });
+    });
+
+    const verificarRoleAdmin = () => {
+      const token = localStorage.getItem('authToken');
+      if (!token) return false;
+  
+      try {
+        const decoded = jwt_decode(token);
+        return decoded.roles && decoded.roles.includes('ROLE_ADMIN');
+      } catch (error) {
+        return false;
+      }
+    };
+  
+    const fetchData = async () => {
+      const token = localStorage.getItem('authToken');
+  
+      if (!token || !verificarRoleAdmin()) {
+        window.location.href = 'index.html';
+        return;
+      }
+  
+      try {
+        const response = await axios.get('https://volans-api-javaspring.onrender.com/admin/dashboard', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+  
+        const data = response.data;
+        if (data) {
+          // Atualizar KPIs
+          document.getElementById('usuariosCadastrados').innerText = data.totalUsuarios || '0';
+          document.getElementById('baralhosCriados').innerText = data.totalBaralhos || '0';
+          document.getElementById('flashcardsCriados').innerText = data.totalFlashcards || '0';
+          
+          // Atualizar nome do admin se disponível
+          if (data.adminName) {
+            document.getElementById('adminName').innerText = data.adminName;
+          }
+          
+          // Renderizar gráficos com o período padrão (mês)
+          renderizarGraficos(data, 'month');
+          
+          // Renderizar tabela de usuários
+          if (data.usuarios && data.usuarios.length > 0) {
+            renderizarTabelaUsuarios(data.usuarios);
+          }
+  
+          document.getElementById('dashboard').style.display = 'block';
+          document.getElementById('loadingMessage').style.display = 'none';
+        } else {
+          alert("Dados da API estão vazios ou indefinidos.");
+        }
+      } catch (error) {
+        if (error.response && error.response.status === 401) {
+          localStorage.removeItem('authToken');
+          window.location.href = 'index.html';
+        } else {
+          alert("Ocorreu um erro ao buscar os dados. Tente novamente.");
+        }
+      }
+    };
+    
+    // Função para atualizar um gráfico específico com base no período selecionado
+    const atualizarGrafico = (chartType, period) => {
+      // Obter dados para o período selecionado
+      const dados = obterDadosPorPeriodo(chartType, period);
+      
+      // Atualizar o gráfico
+      atualizarDadosGrafico(chartType, dados.labels, dados.data, dados.color);
+      
+      // Atualizar o subtítulo do gráfico para mostrar o período atual
+      atualizarSubtituloGrafico(chartType, period);
+    };
+    
+    // Função para atualizar o subtítulo do gráfico
+    const atualizarSubtituloGrafico = (chartType, period) => {
+      const chart = chartType === 'users' ? usersChart : 
+                   chartType === 'flashcards' ? flashcardsChart : decksChart;
+      
+      if (chart) {
+        let subtitle = '';
+        
+        if (period === 'days') {
+          subtitle = 'Últimos 7 dias';
+        } else if (period === 'month') {
+          subtitle = 'Últimas 4 semanas';
+        } else { // year
+          subtitle = 'Últimos 12 meses';
+        }
+        
+        // Atualizar o subtítulo no gráfico
+        chart.options.plugins.subtitle = {
+          display: true,
+          text: subtitle,
+          color: 'rgba(255, 255, 255, 0.7)',
+          font: {
+            size: 12,
+            weight: 'normal'
+          },
+          padding: {
+            bottom: 10
+          }
+        };
+        
+        chart.update();
+      }
+    };
+    
+    // Função para obter dados simulados com base no período e tipo de gráfico
+    const obterDadosPorPeriodo = (chartType, period) => {
+      let labels, data, color;
+      
+      // Definir cores com base no tipo de gráfico
+      if (chartType === 'users') {
+        color = {
+          background: 'rgba(59, 130, 246, 0.5)',
+          border: 'rgba(59, 130, 246, 1)'
+        };
+      } else if (chartType === 'flashcards') {
+        color = {
+          background: 'rgba(139, 92, 246, 0.5)',
+          border: 'rgba(139, 92, 246, 1)'
+        };
+      } else { // decks
+        color = {
+          background: 'rgba(16, 185, 129, 0.5)',
+          border: 'rgba(16, 185, 129, 1)'
+        };
+      }
+      
+      // Definir labels e dados com base no período
+      if (period === 'days') {
+        // Últimos 7 dias
+        const hoje = new Date();
+        labels = [];
+        
+        // Gerar labels para os últimos 7 dias
+        for (let i = 6; i >= 0; i--) {
+          const data = new Date();
+          data.setDate(hoje.getDate() - i);
+          labels.push(data.getDate().toString().padStart(2, '0') + '/' + (data.getMonth() + 1).toString().padStart(2, '0'));
+        }
+        
+        if (chartType === 'users') {
+          data = [12, 19, 15, 8, 22, 14, 10];
+        } else if (chartType === 'flashcards') {
+          data = [45, 62, 58, 71, 89, 43, 52];
+        } else { // decks
+          data = [5, 8, 6, 9, 12, 7, 4];
+        }
+      } else if (period === 'month') {
+        // Últimas 4 semanas
+        labels = ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4'];
+        
+        if (chartType === 'users') {
+          data = [65, 78, 90, 110];
+        } else if (chartType === 'flashcards') {
+          data = [320, 350, 400, 450];
+        } else { // decks
+          data = [45, 50, 55, 60];
+        }
+      } else { // year
+        labels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        
+        if (chartType === 'users') {
+          data = [65, 78, 90, 110, 125, 140, 155, 170, 185, 200, 220, 240];
+        } else if (chartType === 'flashcards') {
+          data = [320, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850];
+        } else { // decks
+          data = [45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
+        }
+      }
+      
+      return { labels, data, color };
+    };
+    
+    // Função para atualizar os dados de um gráfico específico
+    const atualizarDadosGrafico = (chartType, labels, data, color) => {
+      let chart;
+      
+      if (chartType === 'users') {
+        chart = usersChart;
+      } else if (chartType === 'flashcards') {
+        chart = flashcardsChart;
+      } else { // decks
+        chart = decksChart;
+      }
+      
+      if (chart) {
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = data;
+        chart.update();
+      }
+    };
+    
+    const renderizarGraficos = (data, defaultPeriod = 'month') => {
+      // Configurar gráficos com o período padrão
+      const usersData = obterDadosPorPeriodo('users', defaultPeriod);
+      const flashcardsData = obterDadosPorPeriodo('flashcards', defaultPeriod);
+      const decksData = obterDadosPorPeriodo('decks', defaultPeriod);
+      
+      // Configurações comuns para todos os gráficos
+      const configuracoesComuns = {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: 'rgba(255, 255, 255, 0.1)'
+            },
+            ticks: {
+              color: 'rgba(255, 255, 255, 0.7)'
+            }
+          },
+          x: {
+            grid: {
+              color: 'rgba(255, 255, 255, 0.1)'
+            },
+            ticks: {
+              color: 'rgba(255, 255, 255, 0.7)'
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            titleColor: '#fff',
+            bodyColor: '#fff',
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            borderWidth: 1,
+            padding: 10,
+            displayColors: false
+          },
+          subtitle: {
+            display: true,
+            text: defaultPeriod === 'days' ? 'Últimos 7 dias' : 
+                 defaultPeriod === 'month' ? 'Últimas 4 semanas' : 'Últimos 12 meses',
+            color: 'rgba(255, 255, 255, 0.7)',
+            font: {
+              size: 12,
+              weight: 'normal'
+            },
+            padding: {
+              bottom: 10
+            }
+          }
+        }
+      };
+      
+      // Gráfico de Usuários
+      const usersCtx = document.getElementById('usersChart').getContext('2d');
+      usersChart = new Chart(usersCtx, {
+        type: 'bar',
+        data: {
+          labels: usersData.labels,
+          datasets: [{
+            label: 'Usuários',
+            data: usersData.data,
+            backgroundColor: usersData.color.background,
+            borderColor: usersData.color.border,
+            borderWidth: 1,
+            borderRadius: 4
+          }]
+        },
+        options: configuracoesComuns
+      });
+      
+      // Gráfico de Flashcards
+      const flashcardsCtx = document.getElementById('flashcardsChart').getContext('2d');
+      flashcardsChart = new Chart(flashcardsCtx, {
+        type: 'bar',
+        data: {
+          labels: flashcardsData.labels,
+          datasets: [{
+            label: 'Flashcards',
+            data: flashcardsData.data,
+            backgroundColor: flashcardsData.color.background,
+            borderColor: flashcardsData.color.border,
+            borderWidth: 1,
+            borderRadius: 4
+          }]
+        },
+        options: configuracoesComuns
+      });
+      
+      // Gráfico de Baralhos
+      const decksCtx = document.getElementById('decksChart').getContext('2d');
+      decksChart = new Chart(decksCtx, {
+        type: 'bar',
+        data: {
+          labels: decksData.labels,
+          datasets: [{
+            label: 'Baralhos',
+            data: decksData.data,
+            backgroundColor: decksData.color.background,
+            borderColor: decksData.color.border,
+            borderWidth: 1,
+            borderRadius: 4
+          }]
+        },
+        options: configuracoesComuns
+      });
+    };
+    
+    const renderizarTabelaUsuarios = (usuarios) => {
+      const tbody = document.getElementById('usersTableBody');
+      tbody.innerHTML = '';
+      
+      // Se não houver dados reais, usar dados simulados
+      if (!usuarios || usuarios.length === 0) {
+        usuarios = [
+          { nome: 'Maria Silva', email: 'maria@exemplo.com', dataCriacao: '2023-10-15', baralhos: 12, flashcards: 156 },
+          { nome: 'Pedro Santos', email: 'pedro@exemplo.com', dataCriacao: '2023-09-22', baralhos: 8, flashcards: 94 },
+          { nome: 'Ana Oliveira', email: 'ana@exemplo.com', dataCriacao: '2023-10-05', baralhos: 15, flashcards: 203 },
+          { nome: 'Carlos Ferreira', email: 'carlos@exemplo.com', dataCriacao: '2023-08-18', baralhos: 21, flashcards: 312 },
+          { nome: 'Julia Costa', email: 'julia@exemplo.com', dataCriacao: '2023-10-28', baralhos: 3, flashcards: 47 }
+        ];
+      }
+      
+      usuarios.forEach(usuario => {
+        const tr = document.createElement('tr');
+        
+        const tdNome = document.createElement('td');
+        tdNome.textContent = usuario.nome || 'N/A';
+        
+        const tdEmail = document.createElement('td');
+        tdEmail.textContent = usuario.email || 'N/A';
+        
+        const tdData = document.createElement('td');
+        tdData.textContent = usuario.dataCriacao || 'N/A';
+        
+        const tdBaralhos = document.createElement('td');
+        tdBaralhos.textContent = usuario.baralhos || '0';
+        
+        const tdFlashcards = document.createElement('td');
+        tdFlashcards.textContent = usuario.flashcards || '0';
+        
+        tr.appendChild(tdNome);
+        tr.appendChild(tdEmail);
+        tr.appendChild(tdData);
+        tr.appendChild(tdBaralhos);
+        tr.appendChild(tdFlashcards);
+        
+        tbody.appendChild(tr);
+      });
+    };
+  
+    const logout = () => {
+      localStorage.removeItem('authToken');
+      window.location.href = 'index.html';
+    };
+
+    document.getElementById('logoutButton').addEventListener('click', logout);
+  </script>
+</body>
+</html>
