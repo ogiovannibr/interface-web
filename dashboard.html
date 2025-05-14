@@ -137,9 +137,10 @@
     </div>
   </div>
 
-  <script>
+   <script>
     // Variáveis para armazenar as instâncias dos gráficos
     let usersChart, flashcardsChart, decksChart;
+    let dashboardData = {}; // Armazenar os dados recebidos da API
     
     // Verificar se o usuário está autenticado
     document.addEventListener('DOMContentLoaded', function() {
@@ -196,24 +197,22 @@
           headers: { Authorization: `Bearer ${token}` },
         });
   
-        const data = response.data;
-        if (data) {
+        dashboardData = response.data;
+        if (dashboardData) {
           // Atualizar KPIs
-          document.getElementById('usuariosCadastrados').innerText = data.totalUsuarios || '0';
-          document.getElementById('baralhosCriados').innerText = data.totalBaralhos || '0';
-          document.getElementById('flashcardsCriados').innerText = data.totalFlashcards || '0';
+          document.getElementById('usuariosCadastrados').innerText = dashboardData.totalUsuarios || '0';
+          document.getElementById('baralhosCriados').innerText = dashboardData.totalBaralhos || '0';
+          document.getElementById('flashcardsCriados').innerText = dashboardData.totalFlashcards || '0';
           
-          // Atualizar nome do admin se disponível
-          if (data.adminName) {
-            document.getElementById('adminName').innerText = data.adminName;
-          }
+          // Processar os dados para os gráficos
+          processarDadosParaGraficos();
           
           // Renderizar gráficos com o período padrão (mês)
-          renderizarGraficos(data, 'month');
+          renderizarGraficos('month');
           
           // Renderizar tabela de usuários
-          if (data.usuarios && data.usuarios.length > 0) {
-            renderizarTabelaUsuarios(data.usuarios);
+          if (dashboardData.usuarios && dashboardData.usuarios.length > 0) {
+            renderizarTabelaUsuarios(dashboardData.usuarios);
           }
   
           document.getElementById('dashboard').style.display = 'block';
@@ -229,6 +228,147 @@
           alert("Ocorreu um erro ao buscar os dados. Tente novamente.");
         }
       }
+    };
+    
+    // Função para processar os dados recebidos da API e preparar para os gráficos
+    const processarDadosParaGraficos = () => {
+      // Inicializar estruturas para armazenar dados agrupados por mês
+      const dadosUsuariosPorMes = {};
+      const dadosFlashcardsPorMes = {};
+      const dadosBaralhosPorMes = {};
+      
+      // Processar usuários
+      if (dashboardData.usuarios) {
+        dashboardData.usuarios.forEach(usuario => {
+          if (usuario.createdAt) {
+            const data = new Date(usuario.createdAt);
+            const mes = data.getMonth() + 1; // Janeiro é 0
+            const ano = data.getFullYear();
+            const chave = `${mes}/${ano}`;
+            
+            if (!dadosUsuariosPorMes[chave]) {
+              dadosUsuariosPorMes[chave] = 0;
+            }
+            dadosUsuariosPorMes[chave]++;
+          }
+        });
+      }
+      
+      // Processar flashcards
+      if (dashboardData.flashcards) {
+        dashboardData.flashcards.forEach(flashcard => {
+          if (flashcard.createdAt) {
+            const data = new Date(flashcard.createdAt);
+            const mes = data.getMonth() + 1;
+            const ano = data.getFullYear();
+            const chave = `${mes}/${ano}`;
+            
+            if (!dadosFlashcardsPorMes[chave]) {
+              dadosFlashcardsPorMes[chave] = 0;
+            }
+            dadosFlashcardsPorMes[chave]++;
+          }
+        });
+      }
+
+      if (dashboardData.baralhos) {
+        dashboardData.baralhos.forEach(baralhos => {
+          if (baralhos.createdAt) {
+            const data = new Date(baralhos.createdAt);
+            const mes = data.getMonth() + 1; // Janeiro é 0
+            const ano = data.getFullYear();
+            const chave = `${mes}/${ano}`;
+            
+            if (!dadosBaralhosPorMes[chave]) {
+              dadosBaralhosPorMes[chave] = 0;
+            }
+            dadosBaralhosPorMes[chave]++;
+          }
+        });
+      }
+      
+      // Processar baralhos (precisamos dos dados de baralhos, que não estão no JSON exemplo)
+      // Como não temos os baralhos no JSON, vamos usar dados simulados ou deixar vazio
+      // Você precisará adicionar os dados de baralhos na API
+      
+      // Armazenar os dados processados
+      dashboardData.dadosGraficos = {
+        usuarios: dadosUsuariosPorMes,
+        flashcards: dadosFlashcardsPorMes,
+        baralhos: dadosBaralhosPorMes
+      };
+    };
+    
+    // Função para obter dados por período a partir dos dados processados
+    const obterDadosPorPeriodo = (chartType, period) => {
+      let labels = [];
+      let data = [];
+      let color = {};
+      
+      // Definir cores com base no tipo de gráfico
+      if (chartType === 'users') {
+        color = {
+          background: 'rgba(59, 130, 246, 0.5)',
+          border: 'rgba(59, 130, 246, 1)'
+        };
+      } else if (chartType === 'flashcards') {
+        color = {
+          background: 'rgba(139, 92, 246, 0.5)',
+          border: 'rgba(139, 92, 246, 1)'
+        };
+      } else { // decks
+        color = {
+          background: 'rgba(16, 185, 129, 0.5)',
+          border: 'rgba(16, 185, 129, 1)'
+        };
+      }
+      
+      // Obter os dados corretos com base no tipo de gráfico
+      let dadosProcessados;
+      if (chartType === 'users' && dashboardData.dadosGraficos?.usuarios) {
+        dadosProcessados = dashboardData.dadosGraficos.usuarios;
+      } else if (chartType === 'flashcards' && dashboardData.dadosGraficos?.flashcards) {
+        dadosProcessados = dashboardData.dadosGraficos.flashcards;
+      } else if (chartType === 'decks' && dashboardData.dadosGraficos?.baralhos) {
+        dadosProcessados = dashboardData.dadosGraficos.baralhos;
+      }
+      
+      if (dadosProcessados && Object.keys(dadosProcessados).length > 0) {
+        // Ordenar os meses cronologicamente (assumindo que o formato é 'MM/YYYY')
+        const mesesOrdenados = Object.keys(dadosProcessados).sort((a, b) => {
+          const [mesA, anoA] = a.split('/').map(Number);
+          const [mesB, anoB] = b.split('/').map(Number);
+          return anoA - anoB || mesA - mesB;
+        });
+        
+        // Pegar os últimos 12 meses (ou menos se não houver)
+        const mesesParaMostrar = mesesOrdenados.slice(-12);
+        
+        // Preencher labels e dados
+        mesesParaMostrar.forEach(mes => {
+          const [mesNum, ano] = mes.split('/');
+          const nomeMes = obterNomeMes(parseInt(mesNum));
+          labels.push(`${nomeMes}/${ano}`);
+          data.push(dadosProcessados[mes] || 0);
+        });
+      } else {
+        // Se não houver dados, usar dados simulados
+        labels = ['Jan/2023', 'Fev/2023', 'Mar/2023', 'Abr/2023', 'Mai/2023', 'Jun/2023'];
+        data = chartType === 'users' ? [10, 15, 20, 25, 30, 35] :
+               chartType === 'flashcards' ? [50, 75, 100, 125, 150, 175] :
+               [5, 10, 15, 20, 25, 30];
+      }
+      
+      return { labels, data, color };
+    };
+    
+    // Função auxiliar para obter o nome do mês
+    const obterNomeMes = (mesNum) => {
+      const meses = [
+        'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+        'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
+      ];
+      return meses[mesNum - 1] || '';
     };
     
     // Função para atualizar um gráfico específico com base no período selecionado
@@ -254,7 +394,7 @@
         if (period === 'days') {
           subtitle = 'Últimos 7 dias';
         } else if (period === 'month') {
-          subtitle = 'Últimas 4 semanas';
+          subtitle = 'Últimos 12 meses';
         } else { // year
           subtitle = 'Últimos 12 meses';
         }
@@ -277,74 +417,6 @@
       }
     };
     
-    // Função para obter dados simulados com base no período e tipo de gráfico
-    const obterDadosPorPeriodo = (chartType, period) => {
-      let labels, data, color;
-      
-      // Definir cores com base no tipo de gráfico
-      if (chartType === 'users') {
-        color = {
-          background: 'rgba(59, 130, 246, 0.5)',
-          border: 'rgba(59, 130, 246, 1)'
-        };
-      } else if (chartType === 'flashcards') {
-        color = {
-          background: 'rgba(139, 92, 246, 0.5)',
-          border: 'rgba(139, 92, 246, 1)'
-        };
-      } else { // decks
-        color = {
-          background: 'rgba(16, 185, 129, 0.5)',
-          border: 'rgba(16, 185, 129, 1)'
-        };
-      }
-      
-      // Definir labels e dados com base no período
-      if (period === 'days') {
-        // Últimos 7 dias
-        const hoje = new Date();
-        labels = [];
-        
-        // Gerar labels para os últimos 7 dias
-        for (let i = 6; i >= 0; i--) {
-          const data = new Date();
-          data.setDate(hoje.getDate() - i);
-          labels.push(data.getDate().toString().padStart(2, '0') + '/' + (data.getMonth() + 1).toString().padStart(2, '0'));
-        }
-        
-        if (chartType === 'users') {
-          data = [12, 19, 15, 8, 22, 14, 10];
-        } else if (chartType === 'flashcards') {
-          data = [45, 62, 58, 71, 89, 43, 52];
-        } else { // decks
-          data = [5, 8, 6, 9, 12, 7, 4];
-        }
-      } else if (period === 'month') {
-        // Últimas 4 semanas
-        labels = ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4'];
-        
-        if (chartType === 'users') {
-          data = [65, 78, 90, 110];
-        } else if (chartType === 'flashcards') {
-          data = [320, 350, 400, 450];
-        } else { // decks
-          data = [45, 50, 55, 60];
-        }
-      } else { // year
-        labels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-        
-        if (chartType === 'users') {
-          data = [65, 78, 90, 110, 125, 140, 155, 170, 185, 200, 220, 240];
-        } else if (chartType === 'flashcards') {
-          data = [320, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850];
-        } else { // decks
-          data = [45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
-        }
-      }
-      
-      return { labels, data, color };
-    };
-    
     // Função para atualizar os dados de um gráfico específico
     const atualizarDadosGrafico = (chartType, labels, data, color) => {
       let chart;
@@ -360,11 +432,13 @@
       if (chart) {
         chart.data.labels = labels;
         chart.data.datasets[0].data = data;
+        chart.data.datasets[0].backgroundColor = color.background;
+        chart.data.datasets[0].borderColor = color.border;
         chart.update();
       }
     };
     
-    const renderizarGraficos = (data, defaultPeriod = 'month') => {
+    const renderizarGraficos = (defaultPeriod = 'month') => {
       // Configurar gráficos com o período padrão
       const usersData = obterDadosPorPeriodo('users', defaultPeriod);
       const flashcardsData = obterDadosPorPeriodo('flashcards', defaultPeriod);
@@ -408,8 +482,7 @@
           },
           subtitle: {
             display: true,
-            text: defaultPeriod === 'days' ? 'Últimos 7 dias' : 
-                 defaultPeriod === 'month' ? 'Últimas 4 semanas' : 'Últimos 12 meses',
+            text: 'Últimos 12 meses',
             color: 'rgba(255, 255, 255, 0.7)',
             font: {
               size: 12,
@@ -481,34 +554,48 @@
       const tbody = document.getElementById('usersTableBody');
       tbody.innerHTML = '';
       
-      // Se não houver dados reais, usar dados simulados
+      // Verificar se temos dados de usuários
       if (!usuarios || usuarios.length === 0) {
-        usuarios = [
-          { nome: 'Maria Silva', email: 'maria@exemplo.com', dataCriacao: '2023-10-15', baralhos: 12, flashcards: 156 },
-          { nome: 'Pedro Santos', email: 'pedro@exemplo.com', dataCriacao: '2023-09-22', baralhos: 8, flashcards: 94 },
-          { nome: 'Ana Oliveira', email: 'ana@exemplo.com', dataCriacao: '2023-10-05', baralhos: 15, flashcards: 203 },
-          { nome: 'Carlos Ferreira', email: 'carlos@exemplo.com', dataCriacao: '2023-08-18', baralhos: 21, flashcards: 312 },
-          { nome: 'Julia Costa', email: 'julia@exemplo.com', dataCriacao: '2023-10-28', baralhos: 3, flashcards: 47 }
-        ];
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 5;
+        td.textContent = 'Nenhum usuário encontrado';
+        td.style.textAlign = 'center';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
       }
       
-      usuarios.forEach(usuario => {
+      // Ordenar usuários por data de criação (mais recentes primeiro)
+      usuarios.sort((a, b) => {
+        const dataA = a.createdAt ? new Date(a.createdAt) : 0;
+        const dataB = b.createdAt ? new Date(b.createdAt) : 0;
+        return dataB - dataA;
+      });
+      
+      // Pegar os 5 usuários mais recentes
+      const usuariosRecentes = usuarios.slice(0, 5);
+      
+      usuariosRecentes.forEach(usuario => {
         const tr = document.createElement('tr');
         
         const tdNome = document.createElement('td');
-        tdNome.textContent = usuario.nome || 'N/A';
+        tdNome.textContent = usuario.username || 'N/A';
         
         const tdEmail = document.createElement('td');
         tdEmail.textContent = usuario.email || 'N/A';
         
         const tdData = document.createElement('td');
-        tdData.textContent = usuario.dataCriacao || 'N/A';
+        tdData.textContent = usuario.createdAt ? 
+          new Date(usuario.createdAt).toLocaleDateString('pt-BR') : 'N/A';
         
         const tdBaralhos = document.createElement('td');
-        tdBaralhos.textContent = usuario.baralhos || '0';
+        // Como não temos essa informação no JSON, vamos deixar como 'N/A'
+        tdBaralhos.textContent = 'N/A';
         
         const tdFlashcards = document.createElement('td');
-        tdFlashcards.textContent = usuario.flashcards || '0';
+        // Como não temos essa informação no JSON, vamos deixar como 'N/A'
+        tdFlashcards.textContent = 'N/A';
         
         tr.appendChild(tdNome);
         tr.appendChild(tdEmail);
