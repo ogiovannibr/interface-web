@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Volans Admin - Dashboard</title>
+  <link rel="shortcut icon" type="image/png" href="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/LogoVolansWhiteNoBG%201-UAse45zZgUgf201ysCDxjfjzENwBb5.png">
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jwt-decode@3.1.2/build/jwt-decode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -49,15 +50,9 @@
             <div class="chart-title">Usuários</div>
             <div class="time-filter-container">
               <div class="time-filter-label">Período:</div>
-              <div class="time-filter">
-                <button class="time-filter-btn" data-chart="users" data-period="days">
-                  <i class="fas fa-calendar-day"></i> Diário
-                </button>
+              <div class="time-filter single-option">
                 <button class="time-filter-btn active" data-chart="users" data-period="month">
                   <i class="fas fa-calendar-week"></i> Mensal
-                </button>
-                <button class="time-filter-btn" data-chart="users" data-period="year">
-                  <i class="fas fa-calendar"></i> Anual
                 </button>
               </div>
             </div>
@@ -68,46 +63,34 @@
         </div>
         <div class="chart-card">
           <div class="chart-header">
-            <div class="chart-title">Flashcards</div>
-            <div class="time-filter-container">
-              <div class="time-filter-label">Período:</div>
-              <div class="time-filter">
-                <button class="time-filter-btn" data-chart="flashcards" data-period="days">
-                  <i class="fas fa-calendar-day"></i> Diário
-                </button>
-                <button class="time-filter-btn active" data-chart="flashcards" data-period="month">
-                  <i class="fas fa-calendar-week"></i> Mensal
-                </button>
-                <button class="time-filter-btn" data-chart="flashcards" data-period="year">
-                  <i class="fas fa-calendar"></i> Anual
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="chart-content">
-            <canvas id="flashcardsChart"></canvas>
-          </div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-header">
             <div class="chart-title">Baralhos</div>
             <div class="time-filter-container">
               <div class="time-filter-label">Período:</div>
-              <div class="time-filter">
-                <button class="time-filter-btn" data-chart="decks" data-period="days">
-                  <i class="fas fa-calendar-day"></i> Diário
-                </button>
+              <div class="time-filter single-option">
                 <button class="time-filter-btn active" data-chart="decks" data-period="month">
                   <i class="fas fa-calendar-week"></i> Mensal
-                </button>
-                <button class="time-filter-btn" data-chart="decks" data-period="year">
-                  <i class="fas fa-calendar"></i> Anual
                 </button>
               </div>
             </div>
           </div>
           <div class="chart-content">
             <canvas id="decksChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">Flashcards</div>
+            <div class="time-filter-container">
+              <div class="time-filter-label">Período:</div>
+              <div class="time-filter single-option">
+                <button class="time-filter-btn active" data-chart="flashcards" data-period="month">
+                  <i class="fas fa-calendar-week"></i> Mensal
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-content">
+            <canvas id="flashcardsChart"></canvas>
           </div>
         </div>
       </div>
@@ -124,8 +107,6 @@
                 <th>Nome</th>
                 <th>Email</th>
                 <th>Data de Criação</th>
-                <th>Baralhos</th>
-                <th>Flashcards</th>
               </tr>
             </thead>
             <tbody id="usersTableBody">
@@ -385,37 +366,18 @@
     
     // Função para atualizar o subtítulo do gráfico
     const atualizarSubtituloGrafico = (chartType, period) => {
-      const chart = chartType === 'users' ? usersChart : 
-                   chartType === 'flashcards' ? flashcardsChart : decksChart;
-      
-      if (chart) {
-        let subtitle = '';
-        
-        if (period === 'days') {
-          subtitle = 'Últimos 7 dias';
-        } else if (period === 'month') {
-          subtitle = 'Últimos 12 meses';
-        } else { // year
-          subtitle = 'Últimos 12 meses';
-        }
-        
-        // Atualizar o subtítulo no gráfico
-        chart.options.plugins.subtitle = {
-          display: true,
-          text: subtitle,
-          color: 'rgba(255, 255, 255, 0.7)',
-          font: {
-            size: 12,
-            weight: 'normal'
-          },
-          padding: {
-            bottom: 10
-          }
-        };
-        
-        chart.update();
-      }
+  const chart = chartType === 'users' ? usersChart : 
+               chartType === 'flashcards' ? flashcardsChart : decksChart;
+  
+  if (chart) {
+    // Não mostrar mais o subtítulo
+    chart.options.plugins.subtitle = {
+      display: false
     };
+    
+    chart.update();
+  }
+};
     
     // Função para atualizar os dados de um gráfico específico
     const atualizarDadosGrafico = (chartType, labels, data, color) => {
@@ -446,54 +408,50 @@
       
       // Configurações comuns para todos os gráficos
       const configuracoesComuns = {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            grid: {
-              color: 'rgba(255, 255, 255, 0.1)'
-            },
-            ticks: {
-              color: 'rgba(255, 255, 255, 0.7)'
-            }
-          },
-          x: {
-            grid: {
-              color: 'rgba(255, 255, 255, 0.1)'
-            },
-            ticks: {
-              color: 'rgba(255, 255, 255, 0.7)'
-            }
-          }
+  responsive: true,
+  maintainAspectRatio: false,
+  scales: {
+    y: {
+      beginAtZero: true,
+      grid: {
+        color: 'rgba(255, 255, 255, 0.1)'
+      },
+      ticks: {
+        color: 'rgba(255, 255, 255, 0.7)',
+        callback: function(value) {
+          return [0, 5, 10, 20, 30, 40, 50].includes(value) ? value : '';
         },
-        plugins: {
-          legend: {
-            display: false
-          },
-          tooltip: {
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            titleColor: '#fff',
-            bodyColor: '#fff',
-            borderColor: 'rgba(255, 255, 255, 0.1)',
-            borderWidth: 1,
-            padding: 10,
-            displayColors: false
-          },
-          subtitle: {
-            display: true,
-            text: 'Últimos 12 meses',
-            color: 'rgba(255, 255, 255, 0.7)',
-            font: {
-              size: 12,
-              weight: 'normal'
-            },
-            padding: {
-              bottom: 10
-            }
-          }
-        }
-      };
+        stepSize: 5
+      },
+      suggestedMax: 50
+    },
+    x: {
+      grid: {
+        color: 'rgba(255, 255, 255, 0.1)'
+      },
+      ticks: {
+        color: 'rgba(255, 255, 255, 0.7)'
+      }
+    }
+  },
+  plugins: {
+    legend: {
+      display: false
+    },
+    tooltip: {
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      titleColor: '#fff',
+      bodyColor: '#fff',
+      borderColor: 'rgba(255, 255, 255, 0.1)',
+      borderWidth: 1,
+      padding: 10,
+      displayColors: false
+    },
+    subtitle: {
+      display: false
+    }
+  }
+};
       
       // Gráfico de Usuários
       const usersCtx = document.getElementById('usersChart').getContext('2d');
@@ -558,7 +516,7 @@
       if (!usuarios || usuarios.length === 0) {
         const tr = document.createElement('tr');
         const td = document.createElement('td');
-        td.colSpan = 5;
+        td.colSpan = 3; // Alterado de 5 para 3 colunas
         td.textContent = 'Nenhum usuário encontrado';
         td.style.textAlign = 'center';
         tr.appendChild(td);
@@ -589,19 +547,9 @@
         tdData.textContent = usuario.createdAt ? 
           new Date(usuario.createdAt).toLocaleDateString('pt-BR') : 'N/A';
         
-        const tdBaralhos = document.createElement('td');
-        // Como não temos essa informação no JSON, vamos deixar como 'N/A'
-        tdBaralhos.textContent = 'N/A';
-        
-        const tdFlashcards = document.createElement('td');
-        // Como não temos essa informação no JSON, vamos deixar como 'N/A'
-        tdFlashcards.textContent = 'N/A';
-        
         tr.appendChild(tdNome);
         tr.appendChild(tdEmail);
         tr.appendChild(tdData);
-        tr.appendChild(tdBaralhos);
-        tr.appendChild(tdFlashcards);
         
         tbody.appendChild(tr);
       });
@@ -613,6 +561,22 @@
     };
 
     document.getElementById('logoutButton').addEventListener('click', logout);
+
+    // Adicionar estilo para o botão único
+    document.addEventListener('DOMContentLoaded', function() {
+      const style = document.createElement('style');
+      style.textContent = `
+        .time-filter.single-option {
+          width: auto;
+          display: inline-flex;
+        }
+        .time-filter.single-option .time-filter-btn {
+          min-width: 100px;
+          max-width: 120px;
+        }
+      `;
+      document.head.appendChild(style);
+    });
   </script>
 </body>
 </html>
